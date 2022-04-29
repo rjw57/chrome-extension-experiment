@@ -1,0 +1,33 @@
+{
+  "name": "Sound It Out",
+  "description": "Sounds experiment",
+  "version": "1.0",
+  "manifest_version": 3,
+  "host_permissions": [
+    "https://bbc.co.uk/"
+  ],
+  "background": {
+    "service_worker": "worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.bbc.co.uk/sounds/play/*"
+      ],
+      "js": [
+        "play-extension.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "https://www.bbc.co.uk/*"
+      ],
+      "resources": [
+        "inPageListener.js"
+      ]
+    }
+  ]
+}
