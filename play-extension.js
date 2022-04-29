@@ -38,7 +38,7 @@ const decorateTracks = () => {
     jumpButtonEl.addEventListener('click', () => jumpTo(buttonEl.id));
 
     // Add our jump button next to the original.
-    buttonEl.parentElement.prepend(jumpButtonEl);
+    buttonEl.parentElement.appendChild(jumpButtonEl);
   });
 };
 
