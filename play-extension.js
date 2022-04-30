@@ -10,7 +10,6 @@ const decorateTracks = () => {
   const trackListSectionEl = document.querySelector(
       'section[aria-labelledby="sc-id-tracklist"]');
   if (!trackListSectionEl) {
-    console.warning('Could not locate track list section');
     return;
   }
 
