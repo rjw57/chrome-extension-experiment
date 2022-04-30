@@ -7,13 +7,36 @@ scriptEl.onload = () => scriptEl.remove();
 // decorateTracks scans the page for a Tracklist and decorates each track with a
 // cliek event handler.
 const decorateTracks = () => {
+  const trackListSectionEl = document.querySelector(
+      'section[aria-labelledby="sc-id-tracklist"]');
+  if (!trackListSectionEl) {
+    console.warning('Could not locate track list section');
+    return;
+  }
+
+  const trackListEl = trackListSectionEl.querySelector('ul');
+  if (!trackListEl) {
+    throw new Error('Could not locate track list');
+  }
+
   // Create all of the "jump here" buttons added by the extension.
   Array.from(
-      document.querySelectorAll('button[data-bbc-container="aod_tracks"]'),
-  ).forEach((buttonEl) => {
+      trackListEl.querySelectorAll('div.sc-c-basic-tile'),
+  ).forEach((trackContainerEl) => {
+    // Locate or create the button container element.
+    let buttonContainerEl = trackContainerEl.querySelector(
+        'div.sc-c-basic-tile__button');
+    if (!buttonContainerEl) {
+      buttonContainerEl = document.createElement('div');
+      buttonContainerEl.classList.add(
+          'sc-c-basic-tile__button', 'gs-u-mt-', 'gs-u-pt--@m',
+      );
+      trackContainerEl.appendChild(buttonContainerEl);
+    }
+
     // Do we have an existing element?
-    const existingEl = document.querySelector(
-        `button[data-snds-ex-sibling-button-id="${buttonEl.id}"]`,
+    const existingEl = buttonContainerEl.querySelector(
+        `button[data-snds-ex-track-index]`,
     );
 
     // Existing button; do nothing. Othwerwise we need to create one.
@@ -21,50 +44,85 @@ const decorateTracks = () => {
       return;
     }
 
+    // Extract the track index (1-based), title and artist.
+    const trackTitle =
+      trackContainerEl.querySelector('.sc-c-basic-tile__title').innerText;
+    const trackArtist =
+      trackContainerEl.querySelector('.sc-c-basic-tile__artist').innerText;
+    const trackIndex = parseInt(
+        trackContainerEl.querySelector('.sc-c-basic-tile__track-number')
+            .innerText,
+    );
+
+    // Determine the pid for the current page.
+    const canonicalLinkEl = document.querySelector('link[rel="canonical"]');
+    if (!canonicalLinkEl) {
+      throw new Error('Cannot determine canonical page location');
+    }
+    const canonicalUrl = canonicalLinkEl.getAttribute('href');
+    if (!canonicalUrl) {
+      throw new Error('Canonical link element does not have href atribute');
+    }
+    const canonicalUrlMatches = canonicalUrl.match(
+        /^https:\/\/www.bbc.co.uk\/sounds\/play\/(?<pid>[a-z0-9]+)$/);
+    if (!canonicalUrlMatches?.groups?.pid) {
+      throw new Error('Cannot determine canonical pid');
+    }
+    const pid = canonicalUrlMatches.groups.pid;
+
     // Create a similarly styled buton
     const jumpButtonEl = document.createElement('button');
-    jumpButtonEl.setAttribute('data-snds-ex-sibling-button-id', buttonEl.id);
-    jumpButtonEl.className = buttonEl.className;
+    jumpButtonEl.classList.add(
+        'sc-c-icon-button', 'sc-o-button', 'sc-o-button--center', 'gs-u-p',
+    );
 
-    // Clone SVG element from ellipsis button and replace with play icon.
-    const svgEl = buttonEl.querySelector('svg').cloneNode(true);
+    // Create SVG element for button.
+    const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgEl.setAttribute('width', '16px');
+    svgEl.setAttribute('height', '16px');
     svgEl.setAttribute('viewBox', '0 0 24 24');
+    svgEl.setAttribute('aria-hidden', 'true');
+    svgEl.setAttribute('focusable', 'false');
+    svgEl.classList.add(
+        'sc-c-icon', 'sc-c-icon--default',
+    );
     svgEl.innerHTML = '<path d="M8 5.14v14l11-7l-11-7Z"/>';
 
     // Add play icon to jump button.
     jumpButtonEl.appendChild(svgEl);
 
-    // Wire in click event
-    jumpButtonEl.addEventListener('click', () => jumpTo(buttonEl.id));
+    // Contain screen-reader element.
+    const srEl = document.createElement('div');
+    srEl.classList.add('sc-u-screenreader-only');
+    // TODO: title
+    srEl.appendChild(document.createTextNode(
+        `Jump to ${trackTitle} by ${trackArtist}`));
 
-    // Add our jump button next to the original.
-    buttonEl.parentElement.appendChild(jumpButtonEl);
+    // Add screen reader caption to jump button.
+    jumpButtonEl.appendChild(srEl);
+
+    // Wire in click event
+    jumpButtonEl.addEventListener('click', () => jumpTo(pid, trackIndex));
+
+    // Add our jump button to the button container.
+    buttonContainerEl.appendChild(jumpButtonEl);
+
+    // Tag element with track index.
+    jumpButtonEl.setAttribute('data-snds-ex-track-index', `${trackIndex}`);
   });
 };
 
 // Jump to a track given the id of the ellipsis button element.
-const jumpTo = async (buttonElId) => {
-  // Find button.
-  const buttonEl = document.getElementById(buttonElId);
-  if (!buttonEl) {
-    throw new Error(`Passed invalid id: ${buttonElId}`);
-  }
-
-  // Get button metadata and pid.
-  const metadata = JSON.parse(buttonEl.getAttribute('data-bbc-metadata'));
-  const pid = buttonEl.getAttribute('data-bbc-result');
-  if (!pid || !metadata) {
-    throw new Error('Failed to get metadata and pid');
-  }
-
+const jumpTo = async (pid, trackIndex) => {
   // Get version data.
   const {version} = await getEpisodeData(pid);
 
   // Find segment.
-  const {POS: posId} = metadata;
-  const segmentIndex = parseInt(posId.split('::').slice(-1)[0]) - 1;
   const {segment_events: segmentEvents} = version;
-  const segmentEvent = segmentEvents[segmentIndex];
+  const segmentEvent =
+    segmentEvents.filter(
+        ({segment: {type}}) => (type === 'music'),
+    )[trackIndex - 1];
 
   // Get offset within programme of version.
   const {version_offset: offset} = segmentEvent;
@@ -92,6 +150,6 @@ const sendMessage = (request) => new Promise((resolve, reject) => {
 const observer = new MutationObserver(() => decorateTracks());
 observer.observe(
     document.querySelector('div.radio-main'),
-    {childList: true},
+    {childList: true, subtree: true},
 );
 decorateTracks();

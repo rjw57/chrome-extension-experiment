@@ -10,7 +10,7 @@ const getEpisodeData = async (pid) => {
   // Otherwise fetch programme info.
   const encodedPid = encodeURIComponent(pid);
   const {programme: {versions}} = await (await fetch(
-      `https://bbc.co.uk/programmes/${encodedPid}.json`)).json();
+      `https://www.bbc.co.uk/programmes/${encodedPid}.json`)).json();
   const {pid: canonicalVersionPid} = versions.filter(
       ({canonical}) => canonical === 1)[0];
   if (!canonicalVersionPid) {
@@ -19,7 +19,7 @@ const getEpisodeData = async (pid) => {
 
   const encodedVersionPid = encodeURIComponent(canonicalVersionPid);
   const episodeData = await (await fetch(
-      `https://bbc.co.uk/programmes/${encodedVersionPid}.json`)).json();
+      `https://www.bbc.co.uk/programmes/${encodedVersionPid}.json`)).json();
 
   EPISODE_CACHE.set(pid, episodeData);
   return episodeData;

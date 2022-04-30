@@ -3,9 +3,6 @@
   "description": "Sounds experiment",
   "version": "1.0",
   "manifest_version": 3,
-  "host_permissions": [
-    "https://bbc.co.uk/"
-  ],
   "background": {
     "service_worker": "worker.js"
   },
